@@ -8,7 +8,7 @@ import time
 from datetime import timedelta
 
 import db
-from config import MAJOR_BOSSES, cd_map
+from config import MAJOR_BOSSES, cd_map, PUSH_TARGET_MAP
 from line_client import push
 from utils import now_tw, to_tw
 
@@ -45,7 +45,8 @@ def check_once():
         key = (group_id, boss, int(nxt.timestamp()))
         if 0 < diff <= NOTIFY_BEFORE and key not in _notified:
             _notified.add(key)
-            push(group_id, f"⏰【{boss}】即將在 5 分鐘後重生！")
+            # 資料的群組代碼若是 A 群，改推播到新機器人看到的代碼
+            push(PUSH_TARGET_MAP.get(group_id, group_id), f"⏰【{boss}】即將在 5 分鐘後重生！")
 
     # 清掉一小時前的通知紀錄，避免越存越多
     limit = now.timestamp() - 3600
