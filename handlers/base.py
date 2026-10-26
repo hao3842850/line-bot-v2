@@ -15,7 +15,7 @@ class Ctx:
         self.user_id = event.source.user_id
         self.source_id = raw_source_id(event)            # 原始群組 / 聊天室 ID
         self.group_id = shared_group_id(event)           # 王表用的共用群組 ID（B、C 群會換成 A 群）
-        # 訂閱制沿用舊版：用群組 ID，非群組則用個人 ID
+        # 不共用王表的功能（交接班）用的 ID：群組 ID，非群組則用個人 ID
         self.sub_id = getattr(event.source, "group_id", None) or self.user_id
 
     def reply(self, msg, alt_text="訊息"):

@@ -10,7 +10,7 @@
   line_client.py   LINE 回覆 / 推播
   scheduler.py     特殊王重生前 5 分鐘提醒
   api.py           給「戰鬥+」APP 的 API
-  handlers/        各功能的指令處理（王表、KPI、名冊、交接班、競標、訂閱…）
+  handlers/        各功能的指令處理（王表、KPI、名冊、交接班、競標…）
   flex/            各功能的卡片樣式
 """
 import os
@@ -28,9 +28,7 @@ from config import NOTION_URL
 from flex import roster as rf
 from flex import system as sf
 from handlers import dispatch
-from handlers.subscription import check_subscription
 from line_client import handler, reply
-from utils import raw_source_id
 
 
 @asynccontextmanager
@@ -73,8 +71,7 @@ async def callback(request: Request, x_line_signature: str = Header(None)):
 # ===================== LINE 事件 =====================
 @handler.add(JoinEvent)
 def handle_join(event):
-    """機器人被邀請進群組：開始試用並送出歡迎卡片。"""
-    check_subscription(getattr(event.source, "group_id", None) or raw_source_id(event))
+    """機器人被邀請進群組：送出歡迎卡片。"""
     reply(event.reply_token, sf.get_welcome_flex(NOTION_URL), "小幫手報到！")
 
 

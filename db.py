@@ -85,7 +85,7 @@ def execute(sql, params=None):
 
 # ===================== 啟動時檢查資料表 =====================
 # 只會「建立不存在的表」，不會修改或刪除任何舊資料。
-# boss_time、subscriptions 是舊版已存在的表，這裡不動它們。
+# boss_time 是舊版已存在的表，這裡不動它。
 INIT_SQL = [
     """
     CREATE TABLE IF NOT EXISTS fixed_boss_records2 (

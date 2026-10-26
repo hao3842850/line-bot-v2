@@ -26,9 +26,10 @@ LINE 群組吃王小幫手（FastAPI + line-bot-sdk + PostgreSQL），部署在 
 
 ## 資料表
 
-沿用舊版：`boss_time`、`subscriptions`、`fixed_boss_records2`、`roster`、`shift_info`。
+沿用舊版：`boss_time`、`fixed_boss_records2`、`roster`、`shift_info`。
 新增：`bot_state`（名冊修改確認、清除確認、競標進行中的暫存資料）。
 啟動時只會建立不存在的表，不會改動舊資料。
+舊的 `subscriptions`（訂閱制）已停用，表格保留在資料庫中未刪除。
 
 ## 指令一覽
 
@@ -41,4 +42,4 @@ LINE 群組吃王小幫手（FastAPI + line-bot-sdk + PostgreSQL），部署在 
 - 交接班：`接班`、`交班`
 - 競標：`掉落 物品`、`下標 金額`、`結標`
 - 固定王：iOS 捷徑提醒卡片、`固定王統計`
-- 其他：`狀態`、`查詢代碼`
+- 其他：`查詢代碼`

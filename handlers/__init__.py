@@ -3,14 +3,13 @@
 訊息分派：依序交給各功能判斷，第一個「處理了」的功能就停止。
 順序與舊版 handle_message 由上到下的判斷順序相同，避免指令互相搶走。
 """
-from handlers import admin, fixed_boss, subscription, shift, boss, auction, roster, kpi
+from handlers import admin, fixed_boss, shift, boss, auction, roster, kpi
 from handlers.base import Ctx
 
 # 依序執行；每個函式收到 ctx，有處理就回傳 True
 PIPELINE = [
     admin.handle_init,            # 初始化資料庫
-    fixed_boss.handle,            # 固定王提醒 / 紀錄 / 固定王統計（不受訂閱限制）
-    subscription.handle,          # 訂閱檢查（到期就在這裡擋下）＋狀態
+    fixed_boss.handle,            # 固定王提醒 / 紀錄 / 固定王統計
     shift.handle,                 # 交班 / 接班
     boss.handle_before_roster,    # 王名 空、刪 王名
     auction.handle,               # 掉落 / 下標 / 結標
