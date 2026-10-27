@@ -157,9 +157,9 @@ async function renderAdmin(wrap) {
 }
 
 // ========================= 畫面：開單 =========================
-let roster = [], picked = new Set();
+let roster = [], picked = new Set(), showAll = false;
 async function renderCreate() {
-  picked = new Set([ME.user_id]);
+  picked = new Set([ME.user_id]); showAll = !GROUP;
   app.innerHTML = `<div class="top"><div class="t"><button class="back" onclick="go('list')">‹</button>＋ 新增開單</div></div>
     <div class="wrap">
       <label>哪隻王</label><input type="text" id="boss" list="bosses" placeholder="例如：克特" maxlength="50">
@@ -167,18 +167,27 @@ async function renderCreate() {
       <label>掉落物品</label><input type="text" id="items" placeholder="例如：克特的長劍、魔法書" maxlength="200">
       <label>參加者（從名冊勾選）</label>
       <input type="search" id="kw" placeholder="搜尋名字或血盟" oninput="drawChips()">
+      <div class="row" style="margin-top:8px"><span class="sm" id="scopeHint"></span>
+        <button class="chip" id="scopeBtn" onclick="showAll=!showAll;drawChips()"></button></div>
       <div class="chips" id="chips" style="margin-top:8px"><div class="sm">載入名冊中…</div></div>
       <div class="hint" id="pickedHint"></div>
       <div class="hint">沒勾到的人，也可以之後自己按「我要報名」。</div>
       <button class="btn b-primary" id="submit" onclick="submitCreate()">開單並通知群組</button>
     </div>`;
-  try { roster = await api("/api/order/roster"); } catch (e) { roster = []; toast(e.message); }
-  if (!roster.some(p => p.user_id === ME.user_id)) roster.unshift({ user_id: ME.user_id, name: ME.name, clan: ME.clan });
+  try { roster = await api(`/api/order/roster?g=${encodeURIComponent(GROUP)}`); } catch (e) { roster = []; toast(e.message); }
+  if (!roster.some(p => p.user_id === ME.user_id)) roster.unshift({ user_id: ME.user_id, name: ME.name, clan: ME.clan, in_group: true });
   drawChips();
 }
 function drawChips() {
   const kw = (document.getElementById("kw").value || "").trim().toLowerCase();
-  const list = roster.filter(p => !kw || p.name.toLowerCase().includes(kw) || (p.clan || "").toLowerCase().includes(kw));
+  // 預設只列本群出現過的人＋已勾選的人；按「顯示全部」可看所有群組
+  const scope = roster.filter(p => showAll || p.in_group || picked.has(p.user_id));
+  const list = scope.filter(p => !kw || p.name.toLowerCase().includes(kw) || (p.clan || "").toLowerCase().includes(kw));
+  const others = roster.length - roster.filter(p => p.in_group).length;
+  document.getElementById("scopeHint").textContent = showAll ? `所有群組 ${roster.length} 人` : `本群 ${roster.length - others} 人`;
+  const sb = document.getElementById("scopeBtn");
+  sb.style.display = GROUP && others > 0 ? "" : "none";
+  sb.textContent = showAll ? "只看本群" : `顯示全部（+${others}）`;
   document.getElementById("chips").innerHTML = list.map(p =>
     `<button class="chip ${picked.has(p.user_id) ? "on" : ""}" onclick="togglePick('${esc(p.user_id)}')">${esc(p.name)}<span class="c">${esc(p.clan || "")}</span></button>`
   ).join("") || `<div class="sm">找不到符合的人</div>`;

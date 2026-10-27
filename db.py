@@ -125,6 +125,15 @@ INIT_SQL = [
         updated_at TIMESTAMPTZ DEFAULT NOW()
     )
     """,
+    # 誰在哪個群組出現過（開單勾選參加者時，只列出本群的人）
+    """
+    CREATE TABLE IF NOT EXISTS group_members (
+        group_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        last_seen TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (group_id, user_id)
+    )
+    """,
     # 開單系統：一張單一列
     # status：open 報名中 → settled 已填實收、發鑽中 → closed 已結單（canceled 已取消）
     """
@@ -160,6 +169,41 @@ def init_tables():
     with cursor() as cur:
         for sql in INIT_SQL:
             cur.execute(sql)
+        # 用王表裡的登記者補齊群組成員（剛上線時名單才不會是空的）
+        cur.execute("""
+            INSERT INTO group_members (group_id, user_id)
+            SELECT DISTINCT group_id, user_id FROM boss_time
+            WHERE user_id LIKE 'U%%' AND group_id IS NOT NULL
+            ON CONFLICT DO NOTHING
+        """)
+
+
+# ===================== 群組成員紀錄 =====================
+_seen = {}                 # (群組, 使用者) -> 上次寫入時間，避免每則訊息都寫資料庫
+_seen_lock = threading.Lock()
+
+
+def mark_seen(group_id, user_id):
+    """記錄某人在某群組出現過（同一人同一群組 1 小時內只寫一次）。"""
+    import time
+    if not group_id or not user_id or group_id == user_id:
+        return
+    now = time.time()
+    key = (group_id, user_id)
+    with _seen_lock:
+        if now - _seen.get(key, 0) < 3600:
+            return
+        _seen[key] = now
+    try:
+        execute(
+            """
+            INSERT INTO group_members (group_id, user_id, last_seen) VALUES (%s, %s, NOW())
+            ON CONFLICT (group_id, user_id) DO UPDATE SET last_seen = NOW()
+            """,
+            (group_id, user_id),
+        )
+    except Exception as e:
+        print(f"❌ 記錄群組成員失敗: {e}")
 
 
 # ===================== 暫存狀態（bot_state）=====================

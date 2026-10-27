@@ -33,7 +33,7 @@ LINE 群組吃王小幫手（FastAPI + line-bot-sdk + PostgreSQL），部署在 
 ## 資料表
 
 沿用舊版：`boss_time`、`fixed_boss_records2`、`roster`、`shift_info`。
-新增：`bot_state`（名冊修改確認、清除確認、競標進行中的暫存資料）、`orders`、`order_members`（開單系統）。
+新增：`bot_state`（名冊修改確認、清除確認、競標進行中的暫存資料）、`orders`、`order_members`（開單系統）、`group_members`（誰在哪個群組出現過，開單勾選名單用）。
 啟動時只會建立不存在的表，不會改動舊資料。
 舊的 `subscriptions`（訂閱制）已停用，表格保留在資料庫中未刪除。
 

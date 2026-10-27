@@ -88,6 +88,7 @@ def liff_page():
 def api_me(g: str = "", authorization: str = Header(None)):
     """目前使用者：代碼、名冊名稱、是否管理員、帳本統計。"""
     uid, line_name = _verify(authorization)
+    db.mark_seen(g, uid)   # 從群組打開網頁的人，也算在這個群組出現過
     profile = get_profile(uid)
     return {
         "user_id": uid,
@@ -110,14 +111,15 @@ def api_list(tab: str = "open", g: str = "", authorization: str = Header(None)):
 
 
 @router.get("/api/order/roster")
-def api_roster(authorization: str = Header(None)):
-    """開單時勾選參加者用的名冊（每人取最新一筆）。"""
+def api_roster(g: str = "", authorization: str = Header(None)):
+    """開單時勾選參加者用的名冊（每人取最新一筆）；in_group＝這個人有在本群出現過。"""
     _verify(authorization)
     rows = db.fetchall("""
         SELECT DISTINCT ON (line_user_id) line_user_id, game_name, clan_name
         FROM roster ORDER BY line_user_id, updated_at DESC
     """)
-    people = [{"user_id": u, "name": n, "clan": c} for u, n, c in rows]
+    here = {r[0] for r in db.fetchall("SELECT user_id FROM group_members WHERE group_id = %s", (g,))} if g else None
+    people = [{"user_id": u, "name": n, "clan": c, "in_group": here is None or u in here} for u, n, c in rows]
     return sorted(people, key=lambda p: (p["clan"], p["name"]))
 
 

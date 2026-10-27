@@ -32,6 +32,7 @@ from flex import roster as rf
 from flex import system as sf
 from handlers import dispatch
 from line_client import handler, reply
+from utils import shared_group_id
 
 
 @asynccontextmanager
@@ -81,8 +82,11 @@ def handle_join(event):
 
 @handler.add(MemberJoinedEvent)
 def handle_member_joined(event):
-    """新成員入群：提醒加入名冊。"""
+    """新成員入群：記錄成員並提醒加入名冊。"""
     if event.source.type in ("group", "room"):
+        gid = shared_group_id(event)
+        for m in getattr(event.joined, "members", []) or []:
+            db.mark_seen(gid, getattr(m, "user_id", None))
         reply(event.reply_token, rf.build_join_roster_guide_flex())
 
 

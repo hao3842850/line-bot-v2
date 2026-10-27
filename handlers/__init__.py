@@ -5,6 +5,7 @@
 """
 from handlers import admin, fixed_boss, shift, boss, auction, roster, kpi, order
 from handlers.base import Ctx
+import db
 
 # 依序執行；每個函式收到 ctx，有處理就回傳 True
 PIPELINE = [
@@ -25,6 +26,8 @@ PIPELINE = [
 def dispatch(event):
     """處理一則文字訊息。"""
     ctx = Ctx(event)
+    # 記錄這個人在這個群組出現過（開單勾選名單用）
+    db.mark_seen(ctx.group_id, ctx.user_id)
     for step in PIPELINE:
         try:
             if step(ctx):
