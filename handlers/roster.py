@@ -6,6 +6,7 @@
 import db
 from line_client import get_display_name
 from flex import roster as rf
+from flex.theme import notice, P_ERR, P_INFO
 
 
 # ===================== 資料存取 =====================
@@ -69,7 +70,7 @@ def handle(ctx):
     if msg.startswith("加入名冊"):
         parts = msg.split(" ", 2)
         if len(parts) < 3:
-            ctx.reply("❌ 用法：加入名冊 血盟名 遊戲名")
+            ctx.reply(notice("❌ 格式錯誤", "用法：加入名冊 血盟名 遊戲名", tag=P_ERR, footer="例如：加入名冊 酒窖 威士忌乄"))
             return True
         _, clan, game_name = parts
         exists = get_profile(user)
@@ -127,14 +128,14 @@ def handle(ctx):
 
     # ---------- 取消（只有在等待確認修改時才有作用）----------
     if msg == "取消" and db.state_pop(_wait_key(user)) is not None:
-        ctx.reply("❎ 已取消操作")
+        ctx.reply(notice("❎ 已取消操作", tag=P_INFO))
         return True
 
     # ---------- 查名冊 關鍵字（用遊戲名模糊搜尋）----------
     if msg.startswith("查名冊"):
         parts = msg.split(maxsplit=1)
         if len(parts) == 1:
-            ctx.reply("用法：查名冊 關鍵字\n例如：查名冊 威士忌")
+            ctx.reply(notice("🔍 查名冊", "用法：查名冊 關鍵字", tag=P_INFO, footer="例如：查名冊 威士忌"))
             return True
         rows = db.fetchall(
             """
@@ -144,7 +145,7 @@ def handle(ctx):
             (f"%{parts[1].strip()}%",),
         )
         if not rows:
-            ctx.reply("❌ 查無符合的名冊資料")
+            ctx.reply(notice("❌ 查無名冊資料", "找不到符合的角色。", tag=P_ERR))
         else:
             ctx.reply(rf.build_roster_flex(rows), "名冊查詢結果")
         return True

@@ -13,6 +13,7 @@ import threading
 import db
 from utils import now_tw
 from flex import boss as bf
+from flex.theme import notice, P_ERR
 
 
 def parse_special_boss_reminder(text):
@@ -94,7 +95,7 @@ def handle(ctx):
     if ctx.text.startswith("紀錄 "):
         parts = ctx.text.split(" ", 2)
         if len(parts) < 3:
-            ctx.reply("❌ 紀錄格式錯誤，請點擊卡片上的按鈕進行回報。")
+            ctx.reply(notice("❌ 紀錄格式錯誤", "請點擊卡片上的按鈕進行回報。", tag=P_ERR))
             return True
         status, boss_name = parts[1], parts[2]
         try:
@@ -117,7 +118,7 @@ def handle(ctx):
             ctx.reply(bf.build_record_success_flex(boss_name, status))
         except Exception as e:
             print(f"❌ 寫入 fixed_boss_records2 失敗: {e}")
-            ctx.reply(f"❌ 紀錄寫入失敗，請檢查後台！錯誤訊息: {e}")
+            ctx.reply(notice("❌ 紀錄寫入失敗", str(e), tag=P_ERR))
         return True
 
     # ---------- 固定王統計 ----------
@@ -148,7 +149,7 @@ def handle(ctx):
                 print(f"🕛 12:00 已清空群組 {gid} 的固定王紀錄")
         except Exception as e:
             print(f"❌ 固定王統計失敗: {e}")
-            ctx.reply("❌ 讀取統計資料失敗，請稍後再試。")
+            ctx.reply(notice("❌ 統計讀取失敗", "請稍後再試。", tag=P_ERR))
         return True
 
     return False

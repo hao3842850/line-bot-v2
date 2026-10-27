@@ -8,6 +8,7 @@
 """
 import db
 from flex import auction as af
+from flex.theme import notice, P_INFO
 from handlers.roster import get_username
 
 
@@ -53,15 +54,9 @@ def handle(ctx):
         if not res:
             return True
         if res["bidder_name"]:
-            ctx.reply(
-                f"🎊 競標結束！\n\n"
-                f"📦 物品：{res['item']}\n"
-                f"👤 得標者：{res['bidder_name']}\n"
-                f"💰 金額：{res['bid']} 鑽\n\n"
-                f"恭喜得標！請雙方進行交易。"
-            )
+            ctx.reply(af.build_auction_result_flex(res["item"], res["bidder_name"], res["bid"]))
         else:
-            ctx.reply(f"已取消【{res['item']}】的競標（無人下標）。")
+            ctx.reply(notice("🔨 競標取消", f"【{res['item']}】無人下標，已取消。", tag=P_INFO))
         return True
 
     return False

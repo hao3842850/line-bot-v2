@@ -8,6 +8,7 @@
 import db
 from config import MY_ADMIN_ID
 from flex import system as sf
+from flex.theme import notice, P_OK, P_ERR
 
 
 def handle_init(ctx):
@@ -16,9 +17,9 @@ def handle_init(ctx):
         return False
     try:
         db.init_tables()
-        ctx.reply("🛠️ 已發送強制建立資料庫指令！")
+        ctx.reply(notice("🛠 資料庫已初始化", "資料表檢查並建立完成。", tag=P_OK))
     except Exception as e:
-        ctx.reply(f"❌ 初始化發生嚴重錯誤: {e}")
+        ctx.reply(notice("❌ 初始化失敗", str(e), tag=P_ERR))
     return True
 
 

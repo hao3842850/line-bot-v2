@@ -14,7 +14,7 @@ LINE 群組吃王小幫手（FastAPI + line-bot-sdk + PostgreSQL），部署在 
 | `scheduler.py` | 特殊王重生前 5 分鐘提醒 |
 | `api.py` | 給「天堂m戰鬥+」APP 的 API |
 | `handlers/` | 各功能指令（`__init__.py` 決定判斷順序） |
-| `flex/` | 各功能的卡片樣式 |
+| `flex/` | 各功能的卡片樣式（`flex/theme.py` 統一配色與元件，改風格只改這裡） |
 
 ## Railway 環境變數
 

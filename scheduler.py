@@ -10,6 +10,7 @@ from datetime import timedelta
 import db
 from config import MAJOR_BOSSES, cd_map, PUSH_TARGET_MAP
 from line_client import push
+from flex.boss import build_special_reminder_flex
 from utils import now_tw, to_tw
 
 CHECK_INTERVAL = 60      # 幾秒檢查一次
@@ -46,7 +47,7 @@ def check_once():
         if 0 < diff <= NOTIFY_BEFORE and key not in _notified:
             _notified.add(key)
             # 資料的群組代碼若是 A 群，改推播到新機器人看到的代碼
-            push(PUSH_TARGET_MAP.get(group_id, group_id), f"⏰【{boss}】即將在 5 分鐘後重生！")
+            push(PUSH_TARGET_MAP.get(group_id, group_id), build_special_reminder_flex(boss))
 
     # 清掉一小時前的通知紀錄，避免越存越多
     limit = now.timestamp() - 3600

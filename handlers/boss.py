@@ -20,6 +20,7 @@ from config import cd_map, boss_cd_map_for_group, GROUP_B_ID
 from utils import now_tw, to_tw, get_boss, parse_time, sanitize_register_line, next_respawn_info
 from flex import boss as bf
 from flex import kpi as kf
+from flex.theme import notice, P_OK, P_ERR, P_WARN, P_INFO
 from handlers.roster import get_username
 from handlers import kpi as kpi_handler
 
@@ -94,7 +95,7 @@ def cmd_skip(ctx, boss, note):
         return
     rec = get_latest_records(ctx.group_id).get(boss)
     if not rec:
-        ctx.reply(f"❌ 找不到【{boss}】的歷史紀錄，無法進行輪空登記。\n請先使用「一般擊殺登記」建立初始時間基準。")
+        ctx.reply(notice("❌ 無法輪空登記", "找不到歷史紀錄，請先用一般擊殺登記建立時間基準。", boss=boss, tag=P_ERR))
         return
 
     now = now_tw()
@@ -141,7 +142,7 @@ def cmd_undo(ctx, name_input):
     """撤 王名：刪除最近一筆登記，並顯示撤銷後的最新狀態。"""
     boss = get_boss(name_input)
     if not boss:
-        ctx.reply("❌ 找不到該王名，請確認輸入是否正確。")
+        ctx.reply(notice("❌ 找不到王名", "請確認輸入是否正確。", tag=P_ERR, footer="輸入「王列表」查看所有簡稱"))
         return
     try:
         deleted = db.fetchone(
@@ -153,7 +154,7 @@ def cmd_undo(ctx, name_input):
             (ctx.group_id, boss),
         )
         if not deleted:
-            ctx.reply(f"❌ 找不到 {boss} 的任何登記紀錄可供撤銷。")
+            ctx.reply(notice("❌ 無紀錄可撤銷", "目前沒有任何登記紀錄。", boss=boss, tag=P_ERR))
             return
         row = db.fetchone(
             "SELECT kill_time, respawn_time, note FROM boss_time WHERE group_id = %s AND boss_name = %s ORDER BY id DESC LIMIT 1",
@@ -161,14 +162,14 @@ def cmd_undo(ctx, name_input):
         )
     except Exception as e:
         print(f"❌ 撤銷失敗: {e}")
-        ctx.reply("⚠️ 系統處理出錯，請稍後再試。")
+        ctx.reply(notice("⚠️ 系統錯誤", "系統處理出錯，請稍後再試。", tag=P_ERR))
         return
 
     if row:
         content = bf.build_undo_flex(boss, to_tw(row[0]).strftime("%H:%M:%S"), to_tw(row[1]).strftime("%H:%M:%S"), row[2])
         ctx.reply(content, f"撤銷成功：{boss}")
     else:
-        ctx.reply(f"✅ 已撤銷 {boss} 的唯一紀錄，目前無登記資料。")
+        ctx.reply(notice("↩️ 撤銷成功", "已撤銷唯一一筆紀錄，目前沒有登記資料。", boss=boss, tag=P_OK))
 
 
 def cmd_history(ctx, name_input):
@@ -186,10 +187,10 @@ def cmd_history(ctx, name_input):
         ]
     except Exception as e:
         print(f"❌ 查詢錯誤: {e}")
-        ctx.reply("查詢過程發生錯誤，請稍後再試。")
+        ctx.reply(notice("⚠️ 系統錯誤", "查詢過程發生錯誤，請稍後再試。", tag=P_ERR))
         return
     if not history:
-        ctx.reply(f"找不到「{boss}」的紀錄，請確認名稱是否正確。")
+        ctx.reply(notice("❌ 查無紀錄", f"找不到「{boss}」的紀錄，請確認名稱是否正確。", tag=P_ERR))
     else:
         ctx.reply(bf.build_boss_history_flex(boss, history))
 
@@ -198,7 +199,7 @@ def cmd_boot(ctx, token):
     """開機 HHMM：還沒有任何紀錄的王，用開機時間補上一筆（不算 KPI）。"""
     base = parse_time(token)
     if not base:
-        ctx.reply("❌ 時間格式錯誤，請使用 HHMM 或 HHMMSS")
+        ctx.reply(notice("❌ 時間格式錯誤", "請使用 HHMM 或 HHMMSS。", tag=P_ERR, footer="例如：開機 0900"))
         return
     recorded = {r[0] for r in db.fetchall("SELECT DISTINCT boss_name FROM boss_time WHERE group_id = %s", (ctx.group_id,))}
     with db.cursor() as cur:
@@ -245,14 +246,14 @@ def cmd_clear_confirm(ctx):
         db.state_pop(f"clear_wait:{ctx.group_id}")
     except Exception as e:
         print(f"❌ 清除失敗: {e}")
-        ctx.reply(f"⚠️ 清除失敗：{e}")
+        ctx.reply(notice("⚠️ 清除失敗", str(e), tag=P_ERR))
         return
 
     if ranking:
-        bubble = kf.build_kpi_flex("📊 本週 KPI 結算", kpi_handler.period_text(start, end), ranking)
-        ctx.reply([bubble, "🗑️ 資料已完全清空，KPI 結算完畢。"], "KPI 結算")
+        bubble = kf.build_kpi_flex("本週 KPI 結算", kpi_handler.period_text(start, end), ranking)
+        ctx.reply([bubble, notice("🗑 王表已清空", "本週 KPI 已結算完畢。", tag=P_OK)], "KPI 結算")
     else:
-        ctx.reply("🗑️ 資料已清空 (本週無符合條件之 KPI 紀錄)。")
+        ctx.reply(notice("🗑 王表已清空", "本週沒有符合條件的 KPI 紀錄。", tag=P_OK))
 
 
 def cmd_register(ctx):
@@ -301,14 +302,12 @@ def cmd_register(ctx):
             ))
 
     if is_backup:
-        msg = f"📦 備份登記完成：成功 {success} 隻"
-        if failed:
-            msg += f"\n⚠️ 失敗 {failed} 行"
-        ctx.reply(msg)
+        msg = f"成功 {success} 隻" + (f"，失敗 {failed} 行" if failed else "")
+        ctx.reply(notice("📦 備份登記完成", msg, tag=P_WARN if failed else P_OK))
     elif replies:
         # 舊版多行登記只會回第一張卡；新版一次最多回 5 則，超過的改成文字總結
         if len(replies) > MAX_REPLY:
-            replies = replies[:MAX_REPLY - 1] + [f"✅ 另外 {len(replies) - (MAX_REPLY - 1)} 隻也已登記完成"]
+            replies = replies[:MAX_REPLY - 1] + [notice("🔥 登記成功", f"另外 {len(replies) - (MAX_REPLY - 1)} 隻也已登記完成。", tag=P_OK)]
         ctx.reply(replies)
 
 
@@ -338,10 +337,10 @@ def handle(ctx):
     text = ctx.text
 
     if text == "王列表":
-        ctx.reply(bf.build_boss_list_text())
+        ctx.reply(bf.build_boss_list_flex())
         return True
     if text == "王重生":
-        ctx.reply(bf.build_boss_cd_list_text())
+        ctx.reply(bf.build_boss_cd_flex())
         return True
 
     if text.startswith("開機 "):
@@ -357,7 +356,7 @@ def handle(ctx):
         return True
     if text == "取消清除":
         db.state_pop(f"clear_wait:{ctx.group_id}")
-        ctx.reply("❎ 已取消清除")
+        ctx.reply(notice("❎ 已取消清除", tag=P_INFO))
         return True
 
     if text.startswith("查 "):
@@ -367,7 +366,7 @@ def handle(ctx):
     if text.startswith("撤"):
         name = text[1:].strip()
         if not name:
-            ctx.reply("請輸入要撤銷的王名，例如：撤 克特")
+            ctx.reply(notice("↩️ 撤銷", "請輸入要撤銷的王名。", tag=P_INFO, footer="例如：撤 克特"))
         else:
             cmd_undo(ctx, name)
         return True
