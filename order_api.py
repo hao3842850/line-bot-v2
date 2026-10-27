@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse
 
 import db
 import orders
+import members
 from config import LIFF_ID, LIFF_CHANNEL_ID, is_admin, alias_map
 from handlers.roster import get_profile
 
@@ -119,7 +120,9 @@ def api_roster(g: str = "", authorization: str = Header(None)):
         FROM roster ORDER BY line_user_id, updated_at DESC
     """)
     here = {r[0] for r in db.fetchall("SELECT user_id FROM group_members WHERE group_id = %s", (g,))} if g else None
-    people = [{"user_id": u, "name": n, "clan": c, "in_group": here is None or u in here} for u, n, c in rows]
+    # 未綁定成員（X- 開頭）不會在群組出現，一律列出並標記
+    people = [{"user_id": u, "name": n, "clan": c, "placeholder": members.is_placeholder(u),
+               "in_group": here is None or u in here or members.is_placeholder(u)} for u, n, c in rows]
     return sorted(people, key=lambda p: (p["clan"], p["name"]))
 
 
@@ -151,6 +154,45 @@ def api_admin_payall(user_id: str, authorization: str = Header(None)):
     admin = _admin_only(authorization)
     count, amount = _run(orders.pay_all_for_user, admin, user_id)
     return {"count": count, "amount": amount}
+
+
+# ===================== 人員管理（未綁定成員，管理員專用）=====================
+def _member_run(fn, *args):
+    try:
+        return fn(*args)
+    except members.MemberError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/api/order/admin/members")
+def api_members(authorization: str = Header(None)):
+    """未綁定成員列表（含待領金額）。"""
+    _admin_only(authorization)
+    return members.list_placeholders()
+
+
+@router.post("/api/order/admin/members")
+async def api_member_create(request: Request, authorization: str = Header(None)):
+    """新增未綁定成員。body：{clan, name}"""
+    _admin_only(authorization)
+    b = await request.json()
+    return {"user_id": _member_run(members.create, b.get("clan"), b.get("name"))}
+
+
+@router.post("/api/order/admin/members/{pid}/{action}")
+async def api_member_action(pid: str, action: str, request: Request, authorization: str = Header(None)):
+    """bind 綁定到某位已登記成員（body：{user_id}）/ delete 刪除。"""
+    _admin_only(authorization)
+    try:
+        b = await request.json()
+    except Exception:
+        b = {}
+    if action == "bind":
+        return {"moved": _member_run(members.bind, pid, b.get("user_id"))}
+    if action == "delete":
+        _member_run(members.delete, pid)
+        return {"ok": True}
+    raise HTTPException(status_code=404, detail="未知的操作")
 
 
 @router.get("/api/order/{order_id}")

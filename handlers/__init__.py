@@ -23,12 +23,18 @@ PIPELINE = [
 ]
 
 
+# 會附上「請先加入名冊」提示的王表功能（登記、輪空、撤、刪、查、出、打王、開機…）
+BOSS_STEPS = {boss.handle_before_roster, boss.handle, boss.cmd_register}
+
+
 def dispatch(event):
     """處理一則文字訊息。"""
     ctx = Ctx(event)
     # 記錄這個人在這個群組出現過（開單勾選名單用）
     db.mark_seen(ctx.group_id, ctx.user_id)
     for step in PIPELINE:
+        # 王表功能：沒加入名冊的人，回覆時附上登記提示
+        ctx.roster_prompt = step in BOSS_STEPS
         try:
             if step(ctx):
                 return

@@ -111,7 +111,7 @@ function go(view, extra = {}) {
 // ========================= 畫面：列表 =========================
 async function renderList() {
   const tabs = [["open", "報名中"], ["settled", "發鑽中"], ["closed", "已結單"], ["mine", "我的"]];
-  if (ME.is_admin) tabs.push(["admin", "總覽"]);
+  if (ME.is_admin) tabs.push(["admin", "總覽"], ["members", "人員"]);
   const head = `
     <div class="top"><div class="t">💰 開單</div><div class="s">${esc(ME.name)}${ME.clan ? " · " + esc(ME.clan) : ""}</div></div>
     <div class="tabs">${tabs.map(([k, n]) => `<button class="tab ${state.tab === k ? "on" : ""}" onclick="go('list',{tab:'${k}'})">${n}</button>`).join("")}</div>`;
@@ -119,6 +119,7 @@ async function renderList() {
   const wrap = app.querySelector(".wrap");
   try {
     if (state.tab === "admin") return renderAdmin(wrap);
+    if (state.tab === "members") return renderMembers(wrap);
     const list = await api(`/api/order/list?tab=${state.tab}&g=${encodeURIComponent(GROUP)}`);
     let html = "";
     if (state.tab === "mine") {
@@ -184,6 +185,65 @@ async function payAll(i, n, sum) {
   } catch (e) { toast(e.message); }
 }
 
+// ========================= 畫面：人員管理（管理員）=========================
+// 未綁定成員：管理員先建立、還不知道 LINE 的人；本人加入名冊（同遊戲名）會自動接上，也可以手動綁定
+let MEMBERS = [], BIND_LIST = [];
+async function renderMembers(wrap) {
+  MEMBERS = await api("/api/order/admin/members");
+  wrap.innerHTML = `
+    <div class="card"><div class="v">＋ 新增未綁定成員</div>
+      <div class="sm" style="margin-top:2px">還沒登記名冊的人，先建立起來就能開單分鑽。本人之後「加入名冊」時遊戲名一樣，就會自動接上。</div>
+      <label>血盟</label><input type="text" id="mClan" maxlength="50" placeholder="例如：酒窖">
+      <label>遊戲名</label><input type="text" id="mName" maxlength="50" placeholder="例如：威士忌乄">
+      <button class="btn b-primary" onclick="addMember()">新增</button></div>
+    <div class="card" style="padding:4px 14px">${MEMBERS.length ? MEMBERS.map((m, i) => `
+      <div class="mem"><span class="av">${esc(m.name.slice(0, 1))}</span>
+        <span class="n">${esc(m.name)} <span class="sm">${esc(m.clan)}</span>
+          ${m.unpaid ? `<div class="sm" style="color:var(--warn)">待領 ${fmt(m.unpaid)} 💎</div>` : ""}</span>
+        <button class="pill p-me" onclick="openBind(${i})">綁定</button>
+        <button class="x" onclick="delMember(${i})">✕</button></div>
+      <div id="bind${i}" style="display:none"></div>`).join("")
+      : `<div class="empty" style="padding:20px 0">目前沒有未綁定成員</div>`}</div>`;
+}
+async function addMember() {
+  const clan = document.getElementById("mClan").value.trim(), name = document.getElementById("mName").value.trim();
+  if (!clan || !name) return toast("請填寫血盟和遊戲名");
+  try { await api("/api/order/admin/members", { clan, name }); toast("已新增"); renderList(); } catch (e) { toast(e.message); }
+}
+async function delMember(i) {
+  const m = MEMBERS[i];
+  if (!confirm(`刪除未綁定成員「${m.name}」？`)) return;
+  try { await api(`/api/order/admin/members/${encodeURIComponent(m.user_id)}/delete`, {}); toast("已刪除"); renderList(); } catch (e) { toast(e.message); }
+}
+// 綁定：從已加入名冊的人裡選一位
+async function openBind(i) {
+  const box = document.getElementById("bind" + i);
+  if (box.style.display !== "none") { box.style.display = "none"; return; }
+  box.style.display = "block";
+  if (!BIND_LIST.length) {
+    try { BIND_LIST = (await api(`/api/order/roster?g=${encodeURIComponent(GROUP)}`)).filter(p => !p.placeholder); }
+    catch (e) { toast(e.message); return; }
+  }
+  box.innerHTML = `<div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin:2px 0 10px">
+    <div class="sm">把「${esc(MEMBERS[i].name)}」的開單紀錄和待領的鑽，轉給：</div>
+    <input type="search" placeholder="搜尋已登記的成員" style="margin-top:6px" oninput="drawBind(${i}, this.value)">
+    <div class="chips" id="bindChips${i}" style="margin-top:8px"></div></div>`;
+  drawBind(i, "");
+}
+function drawBind(i, kw) {
+  kw = (kw || "").trim().toLowerCase();
+  const list = BIND_LIST.filter(p => !kw || p.name.toLowerCase().includes(kw) || (p.clan || "").toLowerCase().includes(kw)).slice(0, 40);
+  document.getElementById("bindChips" + i).innerHTML = list.map(p =>
+    `<button class="chip" onclick="doBind(${i}, '${esc(p.user_id)}')">${esc(p.name)}<span class="c">${esc(p.clan || "")}</span></button>`).join("")
+    || `<div class="sm">找不到符合的人（對方要先加入名冊）</div>`;
+}
+async function doBind(i, uid) {
+  const m = MEMBERS[i], p = BIND_LIST.find(x => x.user_id === uid);
+  if (!confirm(`把「${m.name}」綁定到「${p ? p.name : ""}」？綁定後無法復原。`)) return;
+  try { const r = await api(`/api/order/admin/members/${encodeURIComponent(m.user_id)}/bind`, { user_id: uid }); toast(`已綁定，轉移 ${r.moved} 筆紀錄`); BIND_LIST = []; renderList(); }
+  catch (e) { toast(e.message); }
+}
+
 // ========================= 畫面：開單 =========================
 let roster = [], picked = new Set(), showAll = false;
 async function renderCreate() {
@@ -217,7 +277,7 @@ function drawChips() {
   sb.style.display = GROUP && others > 0 ? "" : "none";
   sb.textContent = showAll ? "只看本群" : `顯示全部（+${others}）`;
   document.getElementById("chips").innerHTML = list.map(p =>
-    `<button class="chip ${picked.has(p.user_id) ? "on" : ""}" onclick="togglePick('${esc(p.user_id)}')">${esc(p.name)}<span class="c">${esc(p.clan || "")}</span></button>`
+    `<button class="chip ${picked.has(p.user_id) ? "on" : ""}" onclick="togglePick('${esc(p.user_id)}')">${esc(p.name)}<span class="c">${esc(p.clan || "")}${p.placeholder ? "・未綁定" : ""}</span></button>`
   ).join("") || `<div class="sm">找不到符合的人</div>`;
   document.getElementById("pickedHint").textContent = `已選 ${picked.size} 人`;
 }

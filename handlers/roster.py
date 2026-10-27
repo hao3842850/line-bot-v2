@@ -6,7 +6,8 @@
 import db
 from line_client import get_display_name
 from flex import roster as rf
-from flex.theme import notice, P_ERR, P_INFO
+from flex.theme import notice, P_OK, P_ERR, P_INFO
+import members
 
 
 # ===================== 資料存取 =====================
@@ -60,6 +61,11 @@ def _wait_key(user_id):
     return f"roster_wait:{user_id}"
 
 
+def _merged_notice(game_name):
+    """自動合併成功的提示卡。"""
+    return notice("🔗 已接上先前的資料", f"管理員先前建立的「{game_name}」已合併到你身上，參加過的單和待領的鑽都會算給你。", tag=P_OK)
+
+
 # ===================== 指令處理 =====================
 def handle(ctx):
     """處理名冊相關指令；有處理回傳 True。"""
@@ -80,6 +86,12 @@ def handle(ctx):
             ctx.reply(rf.build_roster_confirm_update_flex(exists["name"], exists["clan"], game_name, clan), "名冊已存在")
             return True
         line_name = get_display_name(user, ctx.source_id)
+        # 遊戲名跟管理員建立的「未綁定成員」一樣 → 自動合併（接上他之前的開單與待領的鑽）
+        merged = members.auto_bind_by_name(user, game_name, line_name)
+        if merged:
+            db.execute("UPDATE roster SET clan_name = %s, updated_at = NOW() WHERE line_user_id = %s", (clan, user))
+            ctx.reply([rf.build_roster_added_flex(clan, game_name), _merged_notice(game_name)], "已加入名冊")
+            return True
         db.execute(
             "INSERT INTO roster (line_user_id, line_name, game_name, clan_name) VALUES (%s, %s, %s, %s)",
             (user, line_name, game_name, clan),
@@ -100,7 +112,12 @@ def handle(ctx):
             """,
             (session["name"], session["clan"], line_name, user),
         )
-        ctx.reply(rf.build_roster_update_success_flex(session["name"], session["clan"]), "✅ 名冊更新成功")
+        # 改名後跟某位未綁定成員同名 → 一樣自動合併
+        if members.auto_bind_by_name(user, session["name"], line_name):
+            ctx.reply([rf.build_roster_update_success_flex(session["name"], session["clan"]),
+                       _merged_notice(session["name"])], "✅ 名冊更新成功")
+        else:
+            ctx.reply(rf.build_roster_update_success_flex(session["name"], session["clan"]), "✅ 名冊更新成功")
         return True
 
     # ---------- 查自己 ----------

@@ -5,11 +5,13 @@
 - 「clear ALL」：管理員專用，清除「所有群組」的王表紀錄
 - 「查詢代碼」：顯示本群組的聊天室代碼
 - 「我的ID」：顯示自己的使用者代碼
+- 「新增成員 血盟 遊戲名」：管理員建立未綁定成員
 """
 import db
 from config import is_admin
 from flex import system as sf
 from flex.theme import notice, P_OK, P_ERR
+import members
 
 
 def handle_init(ctx):
@@ -33,6 +35,19 @@ def handle(ctx):
         except Exception as e:
             print(f"❌ 全域刪除失敗: {e}")
         ctx.reply(sf.build_admin_clear_flex(), "⚠️ 全域資料已清除")
+        return True
+
+    # 新增成員 血盟 遊戲名：管理員建立「未綁定成員」（還不知道 LINE 帳號的人）
+    if ctx.text.startswith("新增成員") and is_admin(ctx.user_id):
+        parts = ctx.text.split(" ", 2)
+        if len(parts) < 3:
+            ctx.reply(notice("❌ 格式錯誤", "用法：新增成員 血盟名 遊戲名", tag=P_ERR))
+            return True
+        try:
+            members.create(parts[1], parts[2])
+            ctx.reply(notice("👤 已新增未綁定成員", f"{parts[2]}（{parts[1]}）\n本人之後打「加入名冊 {parts[1]} {parts[2]}」就會自動接上。", tag=P_OK))
+        except members.MemberError as e:
+            ctx.reply(notice("❌ 無法新增", str(e), tag=P_ERR))
         return True
 
     # 我的ID：顯示自己的使用者代碼（純文字方便複製，填進 Railway 的 ADMIN_IDS 用）

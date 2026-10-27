@@ -96,3 +96,14 @@ def build_roster_flex(rows):
     items = [(g, c, l) for g, l, c in rows]
     return bubble("🔍 名冊查詢", _roster_rows(items), sub=_count_note(len(items)),
                   footer="資料有誤請連繫 @H. 進行修正")
+
+
+def build_roster_prompt_flex(display_name=None):
+    """沒加入名冊的人使用王表功能時，附在回覆後面的提示。"""
+    who = f"{display_name}，" if display_name else ""
+    body = [
+        text(f"{who}你還沒加入名冊，登記後王表和 KPI 才會顯示你的遊戲名："),
+        code("加入名冊 血盟名 遊戲角色名"),
+    ]
+    return flex("📝 請先加入名冊", bubble("📝 請先加入名冊", body, right=pill("未登記", P_ERR[1]),
+                                       footer="範例：加入名冊 酒窖 威士忌乄"))
