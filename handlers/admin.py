@@ -44,7 +44,7 @@ def handle(ctx):
             ctx.reply(notice("❌ 格式錯誤", "用法：新增成員 血盟名 遊戲名", tag=P_ERR))
             return True
         try:
-            members.create(parts[1], parts[2])
+            members.create(parts[1], parts[2], ctx.group_id)
             ctx.reply(notice("👤 已新增未綁定成員", f"{parts[2]}（{parts[1]}）\n本人之後打「加入名冊 {parts[1]} {parts[2]}」就會自動接上。", tag=P_OK))
         except members.MemberError as e:
             ctx.reply(notice("❌ 無法新增", str(e), tag=P_ERR))

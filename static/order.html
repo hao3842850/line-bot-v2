@@ -208,7 +208,7 @@ async function renderMembers(wrap) {
 async function addMember() {
   const clan = document.getElementById("mClan").value.trim(), name = document.getElementById("mName").value.trim();
   if (!clan || !name) return toast("請填寫血盟和遊戲名");
-  try { await api("/api/order/admin/members", { clan, name }); toast("已新增"); renderList(); } catch (e) { toast(e.message); }
+  try { await api("/api/order/admin/members", { clan, name, g: GROUP }); toast("已新增"); renderList(); } catch (e) { toast(e.message); }
 }
 async function delMember(i) {
   const m = MEMBERS[i];

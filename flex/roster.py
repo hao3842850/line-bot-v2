@@ -98,11 +98,10 @@ def build_roster_flex(rows):
                   footer="資料有誤請連繫 @H. 進行修正")
 
 
-def build_roster_prompt_flex(display_name=None):
+def build_roster_prompt_flex():
     """沒加入名冊的人使用王表功能時，附在回覆後面的提示。"""
-    who = f"{display_name}，" if display_name else ""
     body = [
-        text(f"{who}你還沒加入名冊，登記後王表和 KPI 才會顯示你的遊戲名："),
+        text("你還沒加入名冊，登記後王表和 KPI 才會顯示你的遊戲名："),
         code("加入名冊 血盟名 遊戲角色名"),
     ]
     return flex("📝 請先加入名冊", bubble("📝 請先加入名冊", body, right=pill("未登記", P_ERR[1]),

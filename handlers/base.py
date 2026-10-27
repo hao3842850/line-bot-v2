@@ -37,12 +37,11 @@ class Ctx:
         if not self.is_group:
             return None
         from handlers.roster import get_profile   # 放這裡避免互相引用
-        from line_client import get_display_name
         from flex.roster import build_roster_prompt_flex
         try:
             if get_profile(self.user_id):
                 return None
-            return build_roster_prompt_flex(get_display_name(self.user_id, self.source_id))
+            return build_roster_prompt_flex()
         except Exception as e:
             print(f"❌ 名冊提示失敗: {e}")
             return None

@@ -120,9 +120,9 @@ def api_roster(g: str = "", authorization: str = Header(None)):
         FROM roster ORDER BY line_user_id, updated_at DESC
     """)
     here = {r[0] for r in db.fetchall("SELECT user_id FROM group_members WHERE group_id = %s", (g,))} if g else None
-    # 未綁定成員（X- 開頭）不會在群組出現，一律列出並標記
+    # 未綁定成員（X- 開頭）也照所屬群組篩選（建立時記錄在哪個群組）
     people = [{"user_id": u, "name": n, "clan": c, "placeholder": members.is_placeholder(u),
-               "in_group": here is None or u in here or members.is_placeholder(u)} for u, n, c in rows]
+               "in_group": here is None or u in here} for u, n, c in rows]
     return sorted(people, key=lambda p: (p["clan"], p["name"]))
 
 
@@ -173,10 +173,10 @@ def api_members(authorization: str = Header(None)):
 
 @router.post("/api/order/admin/members")
 async def api_member_create(request: Request, authorization: str = Header(None)):
-    """新增未綁定成員。body：{clan, name}"""
+    """新增未綁定成員。body：{clan, name, g}"""
     _admin_only(authorization)
     b = await request.json()
-    return {"user_id": _member_run(members.create, b.get("clan"), b.get("name"))}
+    return {"user_id": _member_run(members.create, b.get("clan"), b.get("name"), b.get("g") or None)}
 
 
 @router.post("/api/order/admin/members/{pid}/{action}")

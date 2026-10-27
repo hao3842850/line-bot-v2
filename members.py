@@ -23,8 +23,8 @@ def is_placeholder(user_id):
     return bool(user_id) and str(user_id).startswith(PREFIX)
 
 
-def create(clan, game_name):
-    """建立未綁定成員，回傳代碼。同遊戲名已存在就擋下。"""
+def create(clan, game_name, group_id=None):
+    """建立未綁定成員，回傳代碼。同遊戲名已存在就擋下。group_id：在哪個群組建立（只在該群組的勾選名單出現）。"""
     clan, game_name = (clan or "").strip()[:50], (game_name or "").strip()[:50]
     if not clan or not game_name:
         raise MemberError("請填寫血盟和遊戲名")
@@ -32,6 +32,8 @@ def create(clan, game_name):
         raise MemberError(f"名冊裡已經有「{game_name}」了")
     pid = PREFIX + uuid.uuid4().hex[:10]
     db.execute("INSERT INTO roster (line_user_id, game_name, clan_name) VALUES (%s, %s, %s)", (pid, game_name, clan))
+    if group_id:
+        db.execute("INSERT INTO group_members (group_id, user_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (group_id, pid))
     return pid
 
 
@@ -70,6 +72,13 @@ def bind(placeholder_id, real_id, line_name=None):
         cur.execute("UPDATE order_members SET user_id = %s WHERE user_id = %s", (real_id, placeholder_id))
         moved = cur.rowcount
         cur.execute("UPDATE orders SET creator_id = %s WHERE creator_id = %s", (real_id, placeholder_id))
+        # 未綁定成員所屬的群組，也算真正使用者在那些群組出現過
+        cur.execute("""
+            INSERT INTO group_members (group_id, user_id)
+            SELECT group_id, %s FROM group_members WHERE user_id = %s
+            ON CONFLICT DO NOTHING
+        """, (real_id, placeholder_id))
+        cur.execute("DELETE FROM group_members WHERE user_id = %s", (placeholder_id,))
         # 3. 名冊：真正使用者已有名冊就刪掉未綁定那筆；沒有就把那筆改成他的
         cur.execute("SELECT 1 FROM roster WHERE line_user_id = %s", (real_id,))
         if cur.fetchone():
@@ -106,3 +115,4 @@ def delete(placeholder_id):
             WHERE o.id = m.order_id AND m.user_id = %s AND o.status = 'open'
         """, (placeholder_id,))
         cur.execute("DELETE FROM roster WHERE line_user_id = %s", (placeholder_id,))
+        cur.execute("DELETE FROM group_members WHERE user_id = %s", (placeholder_id,))
