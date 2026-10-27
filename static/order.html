@@ -260,6 +260,7 @@ async function renderCreate() {
       <div class="chips" id="chips" style="margin-top:8px"><div class="sm">載入名冊中…</div></div>
       <div class="hint" id="pickedHint"></div>
       <div class="hint">沒勾到的人，也可以之後自己按「我要報名」。</div>
+      ${ME.is_admin ? `<div class="hint">你是管理員：只是幫忙開單、不分鑽的話，可以取消勾選自己。</div>` : ""}
       <button class="btn b-primary" id="submit" onclick="submitCreate()">開單並通知群組</button>
     </div>`;
   try { roster = await api(`/api/order/roster?g=${encodeURIComponent(GROUP)}`); } catch (e) { roster = []; toast(e.message); }
@@ -281,7 +282,8 @@ function drawChips() {
   ).join("") || `<div class="sm">找不到符合的人</div>`;
   document.getElementById("pickedHint").textContent = `已選 ${picked.size} 人`;
 }
-function togglePick(uid) { if (uid === ME.user_id) return toast("開單者會自動列入"); picked.has(uid) ? picked.delete(uid) : picked.add(uid); drawChips(); }
+// 一般成員開單會自動列入自己；管理員協助開單可以取消勾選自己
+function togglePick(uid) { if (uid === ME.user_id && !ME.is_admin) return toast("開單者會自動列入"); picked.has(uid) ? picked.delete(uid) : picked.add(uid); drawChips(); }
 async function submitCreate() {
   const boss = document.getElementById("boss").value.trim();
   if (!boss) return toast("請填寫是哪隻王");
@@ -334,7 +336,7 @@ async function renderDetail() {
 
   // 操作按鈕
   if (open && !o.joined) html += `<button class="btn b-gold" onclick="doAct(${o.id},'join','報名成功')">我要報名</button>`;
-  if (open && o.joined && ME.user_id !== o.creator_id) html += `<button class="btn b-grey" onclick="doAct(${o.id},'leave','已退出')">退出報名</button>`;
+  if (open && o.joined && (ME.user_id !== o.creator_id || ME.is_admin)) html += `<button class="btn b-grey" onclick="doAct(${o.id},'leave','已退出')">退出報名</button>`;
   if (o.status === "settled" && o.can_manage) html += `<button class="btn b-gold" onclick="doClose(${o.id})">全部發完・結單</button>`;
   if (open && o.can_manage) html += `<button class="btn b-danger" onclick="doCancel(${o.id})">取消這張單</button>`;
   app.innerHTML = html + `</div>`;

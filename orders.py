@@ -154,12 +154,17 @@ def _load_for_manage(order_id, user_id):
 
 # ===================== 寫入 =====================
 def create_order(creator_id, boss, items, member_ids, group_id=None):
-    """開單；開單者自動列入參加者。回傳新單號。"""
+    """開單；一般成員自動列入自己，管理員（協助開單）可以不列入自己。回傳新單號。"""
     boss = (boss or "").strip()[:50]
     items = (items or "").strip()[:200]
     if not boss:
         raise OrderError("請填寫是哪隻王")
-    members = list(dict.fromkeys([creator_id] + [m for m in (member_ids or []) if m]))[:100]
+    picked = [m for m in (member_ids or []) if m]
+    if not is_admin(creator_id):
+        picked = [creator_id] + picked
+    members = list(dict.fromkeys(picked))[:100]
+    if not members:
+        raise OrderError("請至少勾選一位參加者")
     with db.cursor() as cur:
         cur.execute(
             "INSERT INTO orders (group_id, boss, items, creator_id) VALUES (%s, %s, %s, %s) RETURNING id",
@@ -188,13 +193,13 @@ def join(order_id, user_id):
 
 
 def leave(order_id, user_id):
-    """退出報名（開單者不能退出自己的單）。"""
+    """退出報名（一般開單者不能退出自己的單；管理員協助開單可以退出）。"""
     order = get_order(order_id, with_members=False)
     if not order:
         raise OrderError("找不到這張單")
     if order["status"] != "open":
         raise OrderError("這張單已經停止報名")
-    if order["creator_id"] == user_id:
+    if order["creator_id"] == user_id and not is_admin(user_id):
         raise OrderError("開單者不能退出，若要取消請直接取消這張單")
     db.execute("DELETE FROM order_members WHERE order_id = %s AND user_id = %s", (order_id, user_id))
 
