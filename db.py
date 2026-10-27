@@ -125,6 +125,33 @@ INIT_SQL = [
         updated_at TIMESTAMPTZ DEFAULT NOW()
     )
     """,
+    # 開單系統：一張單一列
+    # status：open 報名中 → settled 已填實收、發鑽中 → closed 已結單（canceled 已取消）
+    """
+    CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        group_id TEXT,
+        boss TEXT NOT NULL,
+        items TEXT NOT NULL DEFAULT '',
+        creator_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        amount BIGINT,
+        per_person BIGINT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        settled_at TIMESTAMPTZ,
+        closed_at TIMESTAMPTZ
+    )
+    """,
+    # 開單系統：每張單的參加者（paid = 是否已發鑽）
+    """
+    CREATE TABLE IF NOT EXISTS order_members (
+        order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL,
+        paid BOOLEAN NOT NULL DEFAULT FALSE,
+        joined_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (order_id, user_id)
+    )
+    """,
 ]
 
 

@@ -10,6 +10,8 @@
   line_client.py   LINE 回覆 / 推播
   scheduler.py     特殊王重生前 5 分鐘提醒
   api.py           給「戰鬥+」APP 的 API
+  orders.py        開單系統的資料邏輯
+  order_api.py     開單系統的 LIFF 網頁與 API（網頁檔在 static/order.html）
   handlers/        各功能的指令處理（王表、KPI、名冊、交接班、競標…）
   flex/            各功能的卡片樣式
 """
@@ -24,6 +26,7 @@ from linebot.models import JoinEvent, MemberJoinedEvent, MessageEvent, TextMessa
 import db
 import scheduler
 from api import router as api_router
+from order_api import router as order_router
 from config import NOTION_URL
 from flex import roster as rf
 from flex import system as sf
@@ -46,6 +49,7 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(api_router)
+app.include_router(order_router)   # 開單系統網頁與 API
 
 
 @app.get("/")

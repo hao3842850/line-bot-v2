@@ -18,6 +18,15 @@ TZ = pytz.timezone("Asia/Taipei")
 # ===== 管理員與群組代碼 =====
 MY_ADMIN_ID = "U68c2e4197ef63a2c7fc923baae1f3667"  # 可以使用「clear ALL」的管理員
 
+# 管理員名單：在 Railway 的 ADMIN_IDS 填入使用者代碼（多人用逗號分隔），用「我的ID」指令查詢
+# 管理員可以使用「clear ALL」，以及在開單系統幫任何單填金額、結單、看總覽
+ADMIN_IDS = {MY_ADMIN_ID} | {x.strip() for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()}
+
+
+def is_admin(user_id):
+    """是否為管理員。"""
+    return user_id in ADMIN_IDS
+
 # 共用王表：B 群、C 群的資料一律存到 A 群底下（三個群組看到同一份王表）
 GROUP_A_ID = "C5b59f9fe8a7c3b709742b8f765d8f95e"
 GROUP_B_ID = "Cfea8c07f23c410a1e328871f8573f5e5"
@@ -31,6 +40,11 @@ PUSH_TARGET_MAP = {GROUP_A_ID: GROUP_NEW_ID}
 
 # 「戰鬥+」APP 專用群組（API 只開放這個群組，另外多一隻 5 分鐘 CD 的測試王）
 BOSSPLUS_GROUP_ID = GROUP_A_ID
+
+# ===== 開單系統（LIFF 網頁）=====
+# 在 LINE Developers 建立 LIFF App 後，把 LIFF ID 和 LINE Login 頻道 ID 填進 Railway
+LIFF_ID = os.getenv("LIFF_ID", "")
+LIFF_CHANNEL_ID = os.getenv("LIFF_CHANNEL_ID", "")
 
 # 機器人入群時歡迎卡片上的說明文件連結
 NOTION_URL = "https://erratic-penguin-857.notion.site/M-3069463a3aa78018be13fe885278b1cc?source=copy_link"

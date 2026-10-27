@@ -3,3 +3,4 @@ uvicorn
 line-bot-sdk==2.4.2
 pytz
 psycopg2-binary
+requests

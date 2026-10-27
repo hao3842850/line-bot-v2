@@ -13,6 +13,9 @@ LINE 群組吃王小幫手（FastAPI + line-bot-sdk + PostgreSQL），部署在 
 | `line_client.py` | LINE 回覆 / 推播 |
 | `scheduler.py` | 特殊王重生前 5 分鐘提醒 |
 | `api.py` | 給「天堂m戰鬥+」APP 的 API |
+| `orders.py` | 開單系統的資料邏輯（均分、權限） |
+| `order_api.py` | 開單系統的 LIFF 網頁與 API |
+| `static/order.html` | 開單系統網頁（在 LINE 裡開啟） |
 | `handlers/` | 各功能指令（`__init__.py` 決定判斷順序） |
 | `flex/` | 各功能的卡片樣式（`flex/theme.py` 統一配色與元件，改風格只改這裡） |
 
@@ -21,13 +24,16 @@ LINE 群組吃王小幫手（FastAPI + line-bot-sdk + PostgreSQL），部署在 
 - `LINE_CHANNEL_SECRET`
 - `LINE_CHANNEL_ACCESS_TOKEN`
 - `DATABASE_URL`
+- `LIFF_ID`：開單系統的 LIFF ID
+- `LIFF_CHANNEL_ID`：LIFF 所在 LINE Login 頻道的 Channel ID
+- `ADMIN_IDS`（選填）：管理員使用者代碼，多人用逗號分隔（用「我的ID」查詢）
 
 啟動指令：`python main.py`
 
 ## 資料表
 
 沿用舊版：`boss_time`、`fixed_boss_records2`、`roster`、`shift_info`。
-新增：`bot_state`（名冊修改確認、清除確認、競標進行中的暫存資料）。
+新增：`bot_state`（名冊修改確認、清除確認、競標進行中的暫存資料）、`orders`、`order_members`（開單系統）。
 啟動時只會建立不存在的表，不會改動舊資料。
 舊的 `subscriptions`（訂閱制）已停用，表格保留在資料庫中未刪除。
 
@@ -42,4 +48,5 @@ LINE 群組吃王小幫手（FastAPI + line-bot-sdk + PostgreSQL），部署在 
 - 交接班：`接班`、`交班`
 - 競標：`掉落 物品`、`下標 金額`、`結標`
 - 固定王：iOS 捷徑提醒卡片、`固定王統計`
-- 其他：`查詢代碼`
+- 開單：`開單`（打開開單網頁）、`查單 N`、`報名 N`
+- 其他：`查詢代碼`、`我的ID`
