@@ -123,13 +123,34 @@ def api_roster(g: str = "", authorization: str = Header(None)):
     return sorted(people, key=lambda p: (p["clan"], p["name"]))
 
 
-@router.get("/api/order/admin")
-def api_admin(g: str = "", authorization: str = Header(None)):
-    """管理員總覽：全盟還沒領的鑽。"""
+def _admin_only(authorization):
+    """只有管理員能用的 API；回傳管理員自己的代碼。"""
     uid, _ = _verify(authorization)
     if not is_admin(uid):
         raise HTTPException(status_code=403, detail="只有管理員可以查看")
-    return orders.admin_unpaid(g or None)
+    return uid
+
+
+@router.get("/api/order/admin")
+def api_admin(authorization: str = Header(None)):
+    """管理員總覽：全盟（所有群組）還沒領的鑽，每人一列。"""
+    _admin_only(authorization)
+    return orders.admin_unpaid(None)
+
+
+@router.get("/api/order/admin/user/{user_id}")
+def api_admin_user(user_id: str, authorization: str = Header(None)):
+    """管理員總覽：某個人還沒領的每一張單。"""
+    _admin_only(authorization)
+    return _jsonable(orders.admin_user_detail(user_id))
+
+
+@router.post("/api/order/admin/user/{user_id}/payall")
+def api_admin_payall(user_id: str, authorization: str = Header(None)):
+    """管理員一鍵發完：把某人所有沒領的單標記為已發。"""
+    admin = _admin_only(authorization)
+    count, amount = _run(orders.pay_all_for_user, admin, user_id)
+    return {"count": count, "amount": amount}
 
 
 @router.get("/api/order/{order_id}")

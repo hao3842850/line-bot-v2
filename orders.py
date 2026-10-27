@@ -103,6 +103,40 @@ def admin_unpaid(group_id=None):
     return [{"user_id": u, "name": names.get(u, "未登記玩家"), "amount": int(a), "count": int(c)} for u, a, c in rows]
 
 
+def admin_user_detail(user_id):
+    """管理員總覽：某個人還沒領的每一張單（所有群組）。"""
+    rows = db.fetchall("""
+        SELECT o.id, o.boss, o.per_person, o.created_at
+        FROM order_members m JOIN orders o ON o.id = m.order_id
+        WHERE m.user_id = %s AND o.status IN ('settled','closed') AND NOT m.paid
+        ORDER BY o.id
+    """, (user_id,))
+    return [{"id": i, "boss": b, "amount": int(a or 0), "created_at": c} for i, b, a, c in rows]
+
+
+def pay_all_for_user(operator_id, user_id):
+    """管理員一鍵發完：把某人所有沒領的單標記為已發，發完的單自動結單。回傳 (張數, 金額)。"""
+    if not is_admin(operator_id):
+        raise OrderError("只有管理員可以操作")
+    with db.cursor() as cur:
+        cur.execute("""
+            UPDATE order_members m SET paid = TRUE
+            FROM orders o
+            WHERE o.id = m.order_id AND m.user_id = %s AND NOT m.paid AND o.status IN ('settled','closed')
+            RETURNING o.id, o.per_person
+        """, (user_id,))
+        done = cur.fetchall()
+        ids = [r[0] for r in done]
+        if ids:
+            # 這些單如果全部人都發完了，就自動結單
+            cur.execute("""
+                UPDATE orders o SET status = 'closed', closed_at = NOW()
+                WHERE o.id = ANY(%s) AND o.status = 'settled'
+                  AND NOT EXISTS (SELECT 1 FROM order_members m WHERE m.order_id = o.id AND NOT m.paid)
+            """, (ids,))
+    return len(done), sum(int(r[1] or 0) for r in done)
+
+
 # ===================== 權限 =====================
 def can_manage(order, user_id):
     """開單者或管理員才能管理這張單。"""

@@ -147,13 +147,41 @@ async function renderList() {
 }
 
 // 管理員總覽：全盟還沒領的鑽
+// 管理員總覽：全盟（所有群組）還沒領的鑽；點人名展開明細，可一鍵發完
+let ADMIN_ROWS = [];
 async function renderAdmin(wrap) {
-  const rows = await api(`/api/order/admin?g=${encodeURIComponent(GROUP)}`);
-  const total = rows.reduce((s, r) => s + r.amount, 0);
-  wrap.innerHTML = `<div class="sum"><div class="k">全盟尚未發放</div><div class="n">${fmt(total)} 💎</div><div class="k">${rows.length} 人待領</div></div>
-    <div class="card">${rows.length ? rows.map(r => `<div class="rank"><span class="av">${esc(r.name.slice(0, 1))}</span>
-      <span style="flex:1">${esc(r.name)}<div class="sm">${r.count} 張單</div></span><span class="v" style="color:var(--primary)">${fmt(r.amount)} 💎</span></div>`).join("")
+  ADMIN_ROWS = await api(`/api/order/admin`);
+  const total = ADMIN_ROWS.reduce((s, r) => s + r.amount, 0);
+  wrap.innerHTML = `<div class="sum"><div class="k">全盟尚未發放（所有群組）</div><div class="n">${fmt(total)} 💎</div><div class="k">${ADMIN_ROWS.length} 人待領</div></div>
+    <div class="card">${ADMIN_ROWS.length ? ADMIN_ROWS.map((r, i) => `
+      <div class="rank tap" onclick="toggleUser(${i})"><span class="av">${esc(r.name.slice(0, 1))}</span>
+        <span style="flex:1">${esc(r.name)}<div class="sm">${r.count} 張單 · 點開看明細</div></span>
+        <span class="v" style="color:var(--primary)">${fmt(r.amount)} 💎</span></div>
+      <div id="ud${i}" style="display:none"></div>`).join("")
       : `<div class="empty" style="padding:20px 0">全部都發完了 🎉</div>`}</div>`;
+}
+async function toggleUser(i) {
+  const box = document.getElementById("ud" + i);
+  if (box.style.display !== "none") { box.style.display = "none"; return; }
+  box.style.display = "block";
+  box.innerHTML = `<div class="sm" style="padding:8px 0 8px 40px">載入中…</div>`;
+  try {
+    const list = await api(`/api/order/admin/user/${encodeURIComponent(ADMIN_ROWS[i].user_id)}`);
+    const sum = list.reduce((s, o) => s + o.amount, 0);
+    box.innerHTML = `<div style="background:var(--bg);border-radius:10px;padding:6px 12px;margin:2px 0 10px 40px">
+      ${list.map(o => `<div class="row tap" style="padding:6px 0;border-bottom:1px solid var(--line)" onclick="go('detail',{orderId:${o.id}})">
+        <span>${esc(o.boss)} <span class="sm">#${o.id} · ${date(o.created_at)}</span></span><span class="v">${fmt(o.amount)} 💎 ›</span></div>`).join("")}
+      <button class="btn b-gold" style="margin:10px 0 6px;padding:10px;font-size:14px" onclick="payAll(${i}, ${list.length}, ${sum})">全部標記已發（${list.length} 張・${fmt(sum)} 💎）</button></div>`;
+  } catch (e) { box.innerHTML = `<div class="sm" style="padding:8px 0 8px 40px">${esc(e.message)}</div>`; }
+}
+async function payAll(i, n, sum) {
+  const r = ADMIN_ROWS[i];
+  if (!confirm(`確定已經發給「${r.name}」${n} 張單、共 ${fmt(sum)} 💎？`)) return;
+  try {
+    const res = await api(`/api/order/admin/user/${encodeURIComponent(r.user_id)}/payall`, {});
+    toast(`已標記 ${res.count} 張、${fmt(res.amount)} 💎`);
+    renderList();
+  } catch (e) { toast(e.message); }
 }
 
 // ========================= 畫面：開單 =========================
