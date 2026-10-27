@@ -169,13 +169,12 @@ def init_tables():
     with cursor() as cur:
         for sql in INIT_SQL:
             cur.execute(sql)
-        # 用王表裡的登記者補齊群組成員（剛上線時名單才不會是空的）
-        cur.execute("""
-            INSERT INTO group_members (group_id, user_id)
-            SELECT DISTINCT group_id, user_id FROM boss_time
-            WHERE user_id LIKE 'U%%' AND group_id IS NOT NULL
-            ON CONFLICT DO NOTHING
-        """)
+        # 一次性清理：之前用王表登記者補進群組成員，混入了舊機器人的使用者代碼，全部清掉重新累積
+        # （未綁定成員 X- 開頭保留；只會執行一次，執行過會記在 bot_state）
+        cur.execute("SELECT 1 FROM bot_state WHERE key = 'migr:group_members_reset_v1'")
+        if not cur.fetchone():
+            cur.execute("DELETE FROM group_members WHERE user_id NOT LIKE 'X-%%'")
+            cur.execute("INSERT INTO bot_state (key, value) VALUES ('migr:group_members_reset_v1', 'true'::jsonb)")
 
 
 # ===================== 群組成員紀錄 =====================
