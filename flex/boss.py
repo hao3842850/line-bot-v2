@@ -111,7 +111,7 @@ def build_kill_list_flex(title, display_items):
         # 去掉備註、未打、#過 等字，取得純王名
         pure = boss_info.split("（")[0].split(" <")[0].split(" #")[0].strip()
 
-        time_box = box([text(time_str[:5], size="xs", color="#FFFFFF", bold=True, align="center", wrap=False),
+        time_box = box([text(time_str, size="xs", color="#FFFFFF", bold=True, align="center", wrap=False),
                         text(status, size="xxs", color="#FFFFFF", align="center", wrap=False)],
                        backgroundColor=color, cornerRadius="md", paddingAll="4px", flex=3)
         name = text(boss_info, size="sm", bold=True, flex=7, wrap=True)
