@@ -6,12 +6,14 @@
 - 「查詢代碼」：顯示本群組的聊天室代碼
 - 「我的ID」：顯示自己的使用者代碼
 - 「新增成員 血盟 遊戲名」：管理員建立未綁定成員
+- 「清除舊名冊」→「確定清除舊名冊」：管理員刪除舊機器人留下的名冊
 """
 import db
 from config import is_admin
 from flex import system as sf
-from flex.theme import notice, P_OK, P_ERR
+from flex.theme import notice, P_OK, P_ERR, P_INFO
 import members
+import roster_cleanup
 
 
 def handle_init(ctx):
@@ -48,6 +50,26 @@ def handle(ctx):
             ctx.reply(notice("👤 已新增未綁定成員", f"{parts[2]}（{parts[1]}）\n本人之後打「加入名冊 {parts[1]} {parts[2]}」就會自動接上。", tag=P_OK))
         except members.MemberError as e:
             ctx.reply(notice("❌ 無法新增", str(e), tag=P_ERR))
+        return True
+
+    # 清除舊名冊（管理員）：先檢查、預覽，再確認刪除
+    if ctx.text == "清除舊名冊" and is_admin(ctx.user_id):
+        status, data = roster_cleanup.start_or_get(ctx.source_id)
+        if status == "running":
+            ctx.reply(notice("🔍 檢查中", "還在逐筆檢查名冊，請稍後再打一次「清除舊名冊」。", tag=P_INFO))
+        elif status == "started":
+            sec = max(10, int(data * 0.25))
+            ctx.reply(notice("🔍 開始檢查舊名冊", f"共 {data} 筆，大約需要 {sec} 秒。\n完成後再打一次「清除舊名冊」查看結果，這一步還不會刪除任何資料。", tag=P_INFO))
+        else:
+            ctx.reply(sf.build_roster_cleanup_preview_flex(data))
+        return True
+
+    if ctx.text == "確定清除舊名冊" and is_admin(ctx.user_id):
+        count = roster_cleanup.confirm_delete()
+        if count is None:
+            ctx.reply(notice("❌ 無法清除", "沒有有效的檢查結果（超過 30 分鐘或尚未檢查），請先打「清除舊名冊」。", tag=P_ERR))
+        else:
+            ctx.reply(notice("🗑 舊名冊已清除", f"已刪除 {count} 筆舊名冊（已備份，刪錯可以救回）。新機器人這邊加入的名冊都保留。", tag=P_OK))
         return True
 
     # 我的ID：顯示自己的使用者代碼（純文字方便複製，填進 Railway 的 ADMIN_IDS 用）
