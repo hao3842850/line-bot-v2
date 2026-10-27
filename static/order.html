@@ -28,7 +28,7 @@
   .big { font-size: 17px; font-weight: 800; color: var(--primary); }
   .sm { font-size: 12px; color: var(--sub); }
   .pill { font-size: 11px; font-weight: 700; color: #fff; padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
-  .p-open { background: var(--warn); } .p-settled { background: var(--ok); } .p-closed { background: var(--grey); } .p-canceled { background: var(--err); }
+  .p-open { background: var(--ok); } .p-settled { background: var(--warn); } .p-closed { background: var(--grey); } .p-canceled { background: var(--err); }
   .p-me { background: var(--primary); } .p-paid { background: var(--ok); } .p-unpaid { background: var(--warn); }
   .btn { display: block; width: 100%; text-align: center; padding: 13px; border-radius: 10px; font-weight: 800; font-size: 15px; margin-top: 10px; }
   .b-primary { background: var(--primary); color: #fff; } .b-gold { background: var(--gold); color: var(--primary); }
@@ -65,7 +65,7 @@
 const LIFF_ID = "__LIFF_ID__";                 // 由後端填入
 const Q = new URLSearchParams(location.search);
 const GROUP = Q.get("g") || "";                // 從群組卡片開啟時帶的群組代碼
-const STATUS = { open: "報名中", settled: "發鑽中", closed: "已結單", canceled: "已取消" };
+const STATUS = { open: "開單成功", settled: "發鑽中", closed: "已結單", canceled: "已取消" };
 let ME = null;                                 // 目前使用者
 let state = { view: "list", tab: "open", orderId: null };
 let CUR = null;                                // 目前打開的單
@@ -110,7 +110,7 @@ function go(view, extra = {}) {
 
 // ========================= 畫面：列表 =========================
 async function renderList() {
-  const tabs = [["open", "報名中"], ["settled", "發鑽中"], ["closed", "已結單"], ["mine", "我的"]];
+  const tabs = [["open", "開單成功"], ["settled", "發鑽中"], ["closed", "已結單"], ["mine", "我的"]];
   if (ME.is_admin) tabs.push(["admin", "總覽"], ["members", "人員"]);
   const head = `
     <div class="top"><div class="t">💰 開單</div><div class="s">${esc(ME.name)}${ME.clan ? " · " + esc(ME.clan) : ""}</div></div>
@@ -135,7 +135,7 @@ async function renderList() {
         extra = `<div class="row"><span class="l">我可分</span><span class="v" style="color:var(--primary)">${fmt(o.per_person)} 💎
                  <span class="pill ${o.my_paid ? "p-paid" : "p-unpaid"}">${o.my_paid ? "已領" : "待領"}</span></span></div>`;
       } else if (o.joined && o.status === "open") {
-        extra = `<div class="row"><span class="l">我</span><span class="pill p-me">已報名</span></div>`;
+        extra = `<div class="row"><span class="l">我</span><span class="pill p-me">有參加</span></div>`;
       }
       const per = o.per_person != null && o.status !== "open" ? ` · 每人 ${fmt(o.per_person)} 💎` : "";
       html += `<div class="card tap" onclick="go('detail',{orderId:${o.id}})">
@@ -259,7 +259,7 @@ async function renderCreate() {
         <button class="chip" id="scopeBtn" onclick="showAll=!showAll;drawChips()"></button></div>
       <div class="chips" id="chips" style="margin-top:8px"><div class="sm">載入名冊中…</div></div>
       <div class="hint" id="pickedHint"></div>
-      <div class="hint">沒勾到的人，也可以之後自己按「我要報名」。</div>
+      <div class="hint">參加者由開單者勾選；開單後只有管理員可以增減。</div>
       ${ME.is_admin ? `<div class="hint">你是管理員：只是幫忙開單、不分鑽的話，可以取消勾選自己。</div>` : ""}
       <button class="btn b-primary" id="submit" onclick="submitCreate()">開單並通知群組</button>
     </div>`;
@@ -320,26 +320,58 @@ async function renderDetail() {
 
   // 參加者名單
   const showPaid = o.status === "settled" || o.status === "closed";
+  const canEdit = ME.is_admin && (o.status === "open" || o.status === "settled");   // 只有管理員能增減參加者
   html += `<div class="card" style="padding:4px 14px">${o.members.map(m => {
     let right = "";
     if (showPaid) {
       right = o.can_manage
         ? `<button class="pill ${m.paid ? "p-paid" : "p-unpaid"}" onclick="togglePaid(${o.id},'${esc(m.user_id)}',${!m.paid})">${m.paid ? "已發" : "未發"}</button>`
         : `<span class="pill ${m.paid ? "p-paid" : "p-unpaid"}">${m.paid ? "已發" : "未發"}</span>`;
-    } else if (open && o.can_manage && m.user_id !== o.creator_id) {
-      right = `<button class="x" onclick="removeMember(${o.id},'${esc(m.user_id)}')">✕</button>`;
     }
+    if (canEdit) right += `<button class="x" onclick="removeMember(${o.id},'${esc(m.user_id)}')">✕</button>`;
     const tag = m.user_id === o.creator_id ? ` <span class="sm">開單者</span>` : (m.user_id === ME.user_id ? ` <span class="sm">我</span>` : "");
     return `<div class="mem"><span class="av">${esc(m.name.slice(0, 1))}</span><span class="n">${esc(m.name)}${tag}</span>${right}</div>`;
-  }).join("") || `<div class="empty" style="padding:16px 0">還沒有人報名</div>`}</div>`;
+  }).join("") || `<div class="empty" style="padding:16px 0">沒有參加者</div>`}</div>`;
   if (showPaid && o.can_manage) html += `<div class="hint" style="margin:-4px 2px 8px">點「未發 / 已發」可以切換；全部標記已發會自動結單。</div>`;
+  if (canEdit) html += `<button class="btn b-grey" style="margin-top:0" onclick="openAdd()">＋ 新增參加者</button><div id="addBox" style="margin-top:10px"></div>`;
 
   // 操作按鈕
-  if (open && !o.joined) html += `<button class="btn b-gold" onclick="doAct(${o.id},'join','報名成功')">我要報名</button>`;
-  if (open && o.joined && (ME.user_id !== o.creator_id || ME.is_admin)) html += `<button class="btn b-grey" onclick="doAct(${o.id},'leave','已退出')">退出報名</button>`;
   if (o.status === "settled" && o.can_manage) html += `<button class="btn b-gold" onclick="doClose(${o.id})">全部發完・結單</button>`;
   if (open && o.can_manage) html += `<button class="btn b-danger" onclick="doCancel(${o.id})">取消這張單</button>`;
   app.innerHTML = html + `</div>`;
+}
+
+// 管理員新增參加者：預設列本群的人，可切換全部
+let ADD_LIST = [], addPicked = new Set(), addAll = false;
+async function openAdd() {
+  const box = document.getElementById("addBox");
+  if (box.innerHTML) { box.innerHTML = ""; return; }
+  try { ADD_LIST = await api(`/api/order/roster?g=${encodeURIComponent(GROUP)}`); } catch (e) { return toast(e.message); }
+  const inOrder = new Set(CUR.members.map(m => m.user_id));
+  ADD_LIST = ADD_LIST.filter(p => !inOrder.has(p.user_id));
+  addPicked = new Set(); addAll = !GROUP;
+  box.innerHTML = `<div class="card"><input type="search" id="addKw" placeholder="搜尋名字或血盟" oninput="drawAdd()">
+    <div class="row" style="margin-top:8px"><span class="sm" id="addHint"></span><button class="chip" id="addScope" onclick="addAll=!addAll;drawAdd()"></button></div>
+    <div class="chips" id="addChips" style="margin-top:8px"></div>
+    <button class="btn b-primary" onclick="doAdd()">加入勾選的人</button></div>`;
+  drawAdd();
+}
+function drawAdd() {
+  const kw = (document.getElementById("addKw").value || "").trim().toLowerCase();
+  const scope = ADD_LIST.filter(p => addAll || p.in_group || addPicked.has(p.user_id));
+  const list = scope.filter(p => !kw || p.name.toLowerCase().includes(kw) || (p.clan || "").toLowerCase().includes(kw));
+  const others = ADD_LIST.filter(p => !p.in_group).length;
+  document.getElementById("addHint").textContent = `已選 ${addPicked.size} 人`;
+  const sb = document.getElementById("addScope"); sb.style.display = GROUP && others ? "" : "none";
+  sb.textContent = addAll ? "只看本群" : `顯示全部（+${others}）`;
+  document.getElementById("addChips").innerHTML = list.map(p =>
+    `<button class="chip ${addPicked.has(p.user_id) ? "on" : ""}" onclick="addPicked.has('${esc(p.user_id)}')?addPicked.delete('${esc(p.user_id)}'):addPicked.add('${esc(p.user_id)}');drawAdd()">${esc(p.name)}<span class="c">${esc(p.clan || "")}${p.placeholder ? "・未綁定" : ""}</span></button>`
+  ).join("") || `<div class="sm">沒有可以新增的人</div>`;
+}
+async function doAdd() {
+  if (!addPicked.size) return toast("請勾選要新增的人");
+  try { const r = await api(`/api/order/${CUR.id}/add`, { user_ids: [...addPicked] }); toast(`已新增 ${addPicked.size} 人`); renderDetail(); }
+  catch (e) { toast(e.message); }
 }
 
 // 輸入實收金額時即時試算（無條件捨去）

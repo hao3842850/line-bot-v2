@@ -218,16 +218,14 @@ async def api_create(request: Request, authorization: str = Header(None)):
 
 @router.post("/api/order/{order_id}/{action}")
 async def api_action(order_id: int, action: str, request: Request, authorization: str = Header(None)):
-    """單據操作：join 報名 / leave 退出 / remove 移出某人 / settle 填實收 / paid 標記發鑽 / close 結單 / cancel 取消。"""
+    """單據操作：add 新增參加者 / remove 移除參加者（管理員）/ settle 填實收 / paid 標記發鑽 / close 結單 / cancel 取消。"""
     uid, _ = _verify(authorization)
     try:
         b = await request.json()
     except Exception:
         b = {}
-    if action == "join":
-        _run(orders.join, order_id, uid)
-    elif action == "leave":
-        _run(orders.leave, order_id, uid)
+    if action == "add":
+        _run(orders.add_members, order_id, uid, b.get("user_ids") or [])
     elif action == "remove":
         _run(orders.remove_member, order_id, uid, b.get("user_id"))
     elif action == "settle":

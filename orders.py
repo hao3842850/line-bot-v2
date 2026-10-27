@@ -3,19 +3,20 @@
 開單系統的資料邏輯（網頁 API 和 LINE 指令共用）。
 
 流程：
-  open 報名中 ──填實收金額──> settled 發鑽中 ──全部發完 / 結單──> closed 已結單
+  open 開單成功 ──填實收金額──> settled 發鑽中 ──全部發完 / 結單──> closed 已結單
   open 時可以取消 ──> canceled
 
 規則：
 - 每人可分 = 實收金額 ÷ 人數，無條件捨去（餘數不顯示）
-- 所有人都能開單、報名；只有「開單者」或「管理員」能填實收、標記發鑽、結單、取消
-- 填完實收金額後，參加名單就鎖定，不能再報名或退出
+- 所有人都能開單，參加者由開單者在開單時勾選（沒有自行報名）
+- 只有「開單者」或「管理員」能填實收、標記發鑽、結單、取消
+- 開單後只有「管理員」能增減參加者；已填實收的單會自動重算每人可分
 """
 import db
 from config import is_admin
 from handlers.roster import get_usernames
 
-STATUS_TEXT = {"open": "報名中", "settled": "發鑽中", "closed": "已結單", "canceled": "已取消"}
+STATUS_TEXT = {"open": "開單成功", "settled": "發鑽中", "closed": "已結單", "canceled": "已取消"}
 
 
 class OrderError(Exception):
@@ -50,7 +51,7 @@ def get_order(order_id, with_members=True):
 
 
 def list_orders(tab, user_id, group_id=None, limit=50):
-    """列表分頁：open 報名中 / settled 發鑽中 / closed 已結單 / mine 我參加的。"""
+    """列表分頁：open 開單成功 / settled 發鑽中 / closed 已結單 / mine 我參加的。"""
     where, params = [], []
     if group_id:
         where.append("o.group_id = %s")
@@ -179,41 +180,51 @@ def create_order(creator_id, boss, items, member_ids, group_id=None):
     return order_id
 
 
-def join(order_id, user_id):
-    """報名參加；回傳 True＝新加入、False＝原本就在名單裡。"""
+def _recalc(order_id):
+    """已填實收金額的單，名單變動後重算每人可分（無條件捨去）。"""
+    r = db.fetchone("SELECT status, amount FROM orders WHERE id = %s", (order_id,))
+    if r and r[0] == "settled" and r[1] is not None:
+        n = db.fetchone("SELECT COUNT(*) FROM order_members WHERE order_id = %s", (order_id,))[0]
+        db.execute("UPDATE orders SET per_person = %s WHERE id = %s", (r[1] // n if n else 0, order_id))
+
+
+def _load_for_admin_edit(order_id, operator_id):
+    """只有管理員能增減參加者；已結單 / 已取消的單不能改。"""
+    if not is_admin(operator_id):
+        raise OrderError("只有管理員可以增減參加者")
     order = get_order(order_id, with_members=False)
     if not order:
         raise OrderError("找不到這張單")
-    if order["status"] != "open":
-        raise OrderError("這張單已經停止報名")
-    return db.execute(
-        "INSERT INTO order_members (order_id, user_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-        (order_id, user_id),
-    ) > 0
+    if order["status"] not in ("open", "settled"):
+        raise OrderError("這張單已經結束，不能修改名單")
+    return order
 
 
-def leave(order_id, user_id):
-    """退出報名（一般開單者不能退出自己的單；管理員協助開單可以退出）。"""
-    order = get_order(order_id, with_members=False)
-    if not order:
-        raise OrderError("找不到這張單")
-    if order["status"] != "open":
-        raise OrderError("這張單已經停止報名")
-    if order["creator_id"] == user_id and not is_admin(user_id):
-        raise OrderError("開單者不能退出，若要取消請直接取消這張單")
-    db.execute("DELETE FROM order_members WHERE order_id = %s AND user_id = %s", (order_id, user_id))
+def add_members(order_id, operator_id, user_ids):
+    """管理員新增參加者；已填實收的單會自動重算每人可分。回傳新增人數。"""
+    _load_for_admin_edit(order_id, operator_id)
+    added = 0
+    for uid in list(dict.fromkeys(u for u in (user_ids or []) if u))[:100]:
+        added += db.execute(
+            "INSERT INTO order_members (order_id, user_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (order_id, uid),
+        )
+    _recalc(order_id)
+    return added
 
 
 def remove_member(order_id, operator_id, target_id):
-    """開單者 / 管理員把某人移出名單（只限報名中）。"""
-    order = _load_for_manage(order_id, operator_id)
-    if order["status"] != "open":
-        raise OrderError("填完實收金額後就不能修改名單")
+    """管理員移除參加者；已填實收的單會自動重算每人可分。"""
+    _load_for_admin_edit(order_id, operator_id)
+    n = db.fetchone("SELECT COUNT(*) FROM order_members WHERE order_id = %s", (order_id,))[0]
+    if n <= 1:
+        raise OrderError("至少要保留一位參加者")
     db.execute("DELETE FROM order_members WHERE order_id = %s AND user_id = %s", (order_id, target_id))
+    _recalc(order_id)
 
 
 def settle(order_id, user_id, amount):
-    """填實收金額並計算每人可分（無條件捨去）。報名中、發鑽中都可以填（發鑽中可修正金額）。"""
+    """填實收金額並計算每人可分（無條件捨去）。開單成功、發鑽中都可以填（發鑽中可修正金額）。"""
     order = _load_for_manage(order_id, user_id)
     if order["status"] not in ("open", "settled"):
         raise OrderError("這張單已經結束")
@@ -262,8 +273,8 @@ def close(order_id, user_id):
 
 
 def cancel(order_id, user_id):
-    """取消（只限報名中）。"""
+    """取消（只限開單成功、還沒填實收的單）。"""
     order = _load_for_manage(order_id, user_id)
     if order["status"] != "open":
-        raise OrderError("只有報名中的單可以取消")
+        raise OrderError("已填實收金額的單不能取消")
     db.execute("UPDATE orders SET status = 'canceled', closed_at = NOW() WHERE id = %s", (order_id,))
