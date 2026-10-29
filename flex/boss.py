@@ -78,18 +78,19 @@ def get_delete_result_flex(success, name_input, final_name=None):
 
 
 def build_boss_history_flex(boss_name, history):
-    """查 王名：最近幾筆擊殺紀錄（時間、登記者、備註）。"""
-    body = [big(boss_name)]
-    for i, item in enumerate(history[:10]):
-        if i:
-            body.append(sep("sm"))
-        line = box([text(item.get("time", "-"), color=PRIMARY, bold=True, flex=3, wrap=False),
-                    text(item.get("user", "未知"), flex=4, align="end")], layout="horizontal", margin="sm")
-        body.append(line)
+    """查 王名：最近幾筆擊殺紀錄，一筆一張卡片，左右滑動切換（時間、登記者、備註）。"""
+    items = history[:10]
+    bubbles = []
+    for i, item in enumerate(items):
+        body = [big(boss_name), row("💀 死亡", item.get("time", "-")), row("👤 登記", item.get("user", "未知"))]
         note = str(item.get("note") or "").strip()
         if note:
-            body.append(text(f"📌 {note}", size="xs", color=SUB))
-    return flex(f"📜 {boss_name} 歷史紀錄", bubble("📜 歷史紀錄", body, sub=f"最近 {len(history[:10])} 筆"))
+            body.append(row("📌 備註", note))
+        right = pill("最新", OK) if i == 0 else None
+        footer = "← 左右滑動查看更多 →" if len(items) > 1 else None
+        bubbles.append(bubble("📜 歷史紀錄", body, sub=f"第 {i + 1} / {len(items)} 筆", right=right, footer=footer))
+    contents = bubbles[0] if len(bubbles) == 1 else {"type": "carousel", "contents": bubbles}
+    return flex(f"📜 {boss_name} 歷史紀錄", contents)
 
 
 # ===================== 打王列表 =====================
