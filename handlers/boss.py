@@ -173,17 +173,19 @@ def cmd_undo(ctx, name_input):
 
 
 def cmd_history(ctx, name_input):
-    """查 王名：最近 5 筆擊殺紀錄。"""
+    """查 王名：最近 5 筆擊殺紀錄（含重生時間）。"""
     boss = get_boss(name_input) or name_input
     try:
         # 舊版這裡沒用共用群組 ID，B、C 群會查不到資料，已修正
         rows = db.fetchall(
-            "SELECT kill_time, user_id, note FROM boss_time WHERE group_id = %s AND boss_name = %s ORDER BY kill_time DESC LIMIT 5",
+            "SELECT kill_time, respawn_time, user_id, note FROM boss_time WHERE group_id = %s AND boss_name = %s ORDER BY kill_time DESC LIMIT 5",
             (ctx.group_id, boss),
         )
         history = [
-            {"time": to_tw(kt).strftime("%m/%d %H:%M"), "user": get_username(uid), "note": note or ""}
-            for kt, uid, note in rows
+            {"time": to_tw(kt).strftime("%m/%d %H:%M"),
+             "respawn": to_tw(rt).strftime("%m/%d %H:%M") if rt else "-",
+             "user": get_username(uid), "note": note or ""}
+            for kt, rt, uid, note in rows
         ]
     except Exception as e:
         print(f"❌ 查詢錯誤: {e}")

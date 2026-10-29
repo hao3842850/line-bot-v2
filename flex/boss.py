@@ -78,14 +78,17 @@ def get_delete_result_flex(success, name_input, final_name=None):
 
 
 def build_boss_history_flex(boss_name, history):
-    """查 王名：最近幾筆擊殺紀錄，一筆一張卡片，左右滑動切換（時間、登記者、備註）。"""
+    """查 王名：最近幾筆擊殺紀錄，一筆一張卡片，左右滑動切換（死亡時間、重生時間、備註、登記人）。"""
     items = history[:10]
     bubbles = []
     for i, item in enumerate(items):
-        body = [big(boss_name), row("💀 死亡", item.get("time", "-")), row("👤 登記", item.get("user", "未知"))]
-        note = str(item.get("note") or "").strip()
-        if note:
-            body.append(row("📌 備註", note))
+        body = [
+            big(boss_name),
+            row("💀 死亡時間", item.get("time", "-")),
+            row("✨ 重生時間", item.get("respawn", "-")),
+            row("📌 備註", str(item.get("note") or "").strip() or "-"),
+            row("👤 登記人", item.get("user", "未知")),
+        ]
         right = pill("最新", OK) if i == 0 else None
         footer = "← 左右滑動查看更多 →" if len(items) > 1 else None
         bubbles.append(bubble("📜 歷史紀錄", body, sub=f"第 {i + 1} / {len(items)} 筆", right=right, footer=footer))
